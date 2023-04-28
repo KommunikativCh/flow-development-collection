@@ -117,12 +117,6 @@ abstract class Arrays
      */
     public static function arrayMergeRecursiveOverruleWithCallback(array $firstArray, array $secondArray, \Closure $toArray, ?\Closure $overrideFirst = null): array
     {
-        if (!$overrideFirst instanceof \Closure) {
-            $overrideFirst = function ($key, ?array $firstValue = null, ?array $secondValue = null): bool {
-                return false;
-            };
-        }
-
         $data = [&$firstArray, $secondArray];
         $entryCount = 1;
         for ($i = 0; $i < $entryCount; $i++) {
@@ -141,7 +135,7 @@ abstract class Arrays
                     }
 
                     if (is_array($firstArrayInner[$key]) && is_array($value)) {
-                        if ($overrideFirst($key, $firstArrayInner[$key], $value)) {
+                        if ($overrideFirst !== null && $overrideFirst($key, $firstArrayInner[$key], $value)) {
                             $firstArrayInner[$key] = $value;
                         }
 
@@ -290,7 +284,7 @@ abstract class Arrays
      * @return boolean true on success, false on failure
      * @see asort()
      */
-    public static function sortKeysRecursively(array &$array, int $sortFlags = null): bool
+    public static function sortKeysRecursively(array &$array, int $sortFlags = SORT_REGULAR): bool
     {
         foreach ($array as &$value) {
             if (is_array($value)) {

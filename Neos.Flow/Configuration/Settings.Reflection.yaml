@@ -22,6 +22,8 @@ Neos:
         'Then': true
         'BeforeScenario': true
         'AfterScenario': true
+        'BeforeSuite': true
+        'AfterSuite': true
         'fixtures': true
         'Isolated': true
         'AfterFeature': true
@@ -33,6 +35,7 @@ Neos:
         'doesNotPerformAssertions': true
         'template': true
         'psalm': true
+        'psalm-immutable': true
 
       # If enabled, the Reflection Service notes all incorrect or inconsistent usage
       # of @param annotations in the default log.

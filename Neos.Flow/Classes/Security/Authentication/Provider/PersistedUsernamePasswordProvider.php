@@ -14,10 +14,10 @@ namespace Neos\Flow\Security\Authentication\Provider;
 use Neos\Flow\Annotations as Flow;
 use Neos\Flow\Security\Account;
 use Neos\Flow\Security\AccountRepository;
-use Neos\Flow\Security\Authentication\Token\UsernamePassword;
-use Neos\Flow\Security\Authentication\Token\UsernamePasswordHttpBasic;
+use Neos\Flow\Security\Authentication\Token\UsernamePasswordTokenInterface;
 use Neos\Flow\Security\Authentication\TokenInterface;
 use Neos\Flow\Security\Context;
+use Neos\Flow\Security\Cryptography\PrecomposedHashProvider;
 use Neos\Flow\Security\Cryptography\HashService;
 use Neos\Flow\Security\Exception\UnsupportedAuthenticationTokenException;
 
@@ -53,13 +53,21 @@ class PersistedUsernamePasswordProvider extends AbstractProvider
     protected $persistenceManager;
 
     /**
+     * The PrecomposedHashProvider has to be injected non-lazy to prevent timing differences
+     *
+     * @var PrecomposedHashProvider
+     * @Flow\Inject(lazy=false)
+     */
+    protected $precomposedHashProvider;
+
+    /**
      * Returns the class names of the tokens this provider can authenticate.
      *
      * @return array
      */
     public function getTokenClassNames()
     {
-        return [UsernamePassword::class, UsernamePasswordHttpBasic::class];
+        return [UsernamePasswordTokenInterface::class];
     }
 
     /**
@@ -74,37 +82,38 @@ class PersistedUsernamePasswordProvider extends AbstractProvider
      */
     public function authenticate(TokenInterface $authenticationToken)
     {
-        if (!($authenticationToken instanceof UsernamePassword)) {
-            throw new UnsupportedAuthenticationTokenException('This provider cannot authenticate the given token.', 1217339840);
+        if (!($authenticationToken instanceof UsernamePasswordTokenInterface)) {
+            throw new UnsupportedAuthenticationTokenException(sprintf('This provider cannot authenticate the given token. The token must implement %s', UsernamePasswordTokenInterface::class), 1217339840);
         }
 
         /** @var $account Account */
         $account = null;
-        $credentials = $authenticationToken->getCredentials();
 
         if ($authenticationToken->getAuthenticationStatus() !== TokenInterface::AUTHENTICATION_SUCCESSFUL) {
             $authenticationToken->setAuthenticationStatus(TokenInterface::NO_CREDENTIALS_GIVEN);
         }
 
-        if (!is_array($credentials) || !isset($credentials['username']) || !isset($credentials['password'])) {
+        $username = $authenticationToken->getUsername();
+        $password = $authenticationToken->getPassword();
+
+        if ($username === '' || $password === '') {
             return;
         }
 
-        $providerName = $this->name;
-        $accountRepository = $this->accountRepository;
-        $this->securityContext->withoutAuthorizationChecks(function () use ($credentials, $providerName, $accountRepository, &$account) {
-            $account = $accountRepository->findActiveByAccountIdentifierAndAuthenticationProviderName($credentials['username'], $providerName);
+        $providerName = $this->options['lookupProviderName'] ?? $this->name;
+        $this->securityContext->withoutAuthorizationChecks(function () use ($username, &$account, $providerName) {
+            $account = $this->accountRepository->findActiveByAccountIdentifierAndAuthenticationProviderName($username, $providerName);
         });
 
         $authenticationToken->setAuthenticationStatus(TokenInterface::WRONG_CREDENTIALS);
 
         if ($account === null) {
-            // validate the account anyways (with a dummy salt) in order to prevent timing attacks on this provider
-            $this->hashService->validatePassword($credentials['password'], 'bcrypt=>$2a$16$RW.NZM/uP3mC8rsXKJGuN.2pG52thRp5w39NFO.ShmYWV7mJQp0rC');
+            // validate anyways (with a precomposed hash) in order to prevent timing attacks on this provider
+            $this->hashService->validatePassword($password, $this->precomposedHashProvider->getPrecomposedHash());
             return;
         }
 
-        if ($this->hashService->validatePassword($credentials['password'], $account->getCredentialsSource())) {
+        if ($this->hashService->validatePassword($password, $account->getCredentialsSource())) {
             $account->authenticationAttempted(TokenInterface::AUTHENTICATION_SUCCESSFUL);
             $authenticationToken->setAuthenticationStatus(TokenInterface::AUTHENTICATION_SUCCESSFUL);
             $authenticationToken->setAccount($account);
@@ -112,6 +121,6 @@ class PersistedUsernamePasswordProvider extends AbstractProvider
             $account->authenticationAttempted(TokenInterface::WRONG_CREDENTIALS);
         }
         $this->accountRepository->update($account);
-        $this->persistenceManager->whitelistObject($account);
+        $this->persistenceManager->allowObject($account);
     }
 }

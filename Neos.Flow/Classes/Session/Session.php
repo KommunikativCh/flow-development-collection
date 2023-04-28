@@ -55,6 +55,7 @@ class Session implements CookieEnabledInterface
     protected $objectManager;
 
     /**
+     * @Flow\Inject(name="Neos.Flow:SystemLogger")
      * @var LoggerInterface
      */
     protected $logger;
@@ -74,6 +75,13 @@ class Session implements CookieEnabledInterface
      * @var VariableFrontend
      */
     protected $storageCache;
+
+    /**
+     * @deprecated will be removed with Flow 9 as this is only needed to avoid breakiness
+     * @Flow\Inject
+     * @var SessionManagerInterface
+     */
+    protected $sessionManager;
 
     /**
      * @var string
@@ -106,6 +114,11 @@ class Session implements CookieEnabledInterface
     protected $sessionCookieHttpOnly = true;
 
     /**
+     * @var string
+     */
+    protected $sessionCookieSameSite;
+
+    /**
      * @var Cookie
      */
     protected $sessionCookie;
@@ -129,16 +142,6 @@ class Session implements CookieEnabledInterface
      * @var integer
      */
     protected $now;
-
-    /**
-     * @var float
-     */
-    protected $garbageCollectionProbability;
-
-    /**
-     * @var integer
-     */
-    protected $garbageCollectionMaximumPerRun;
 
     /**
      * The session identifier
@@ -232,8 +235,7 @@ class Session implements CookieEnabledInterface
         $this->sessionCookiePath = $settings['session']['cookie']['path'];
         $this->sessionCookieSecure = (boolean)$settings['session']['cookie']['secure'];
         $this->sessionCookieHttpOnly = (boolean)$settings['session']['cookie']['httponly'];
-        $this->garbageCollectionProbability = $settings['session']['garbageCollection']['probability'];
-        $this->garbageCollectionMaximumPerRun = $settings['session']['garbageCollection']['maximumPerRun'];
+        $this->sessionCookieSameSite = $settings['session']['cookie']['samesite'];
         $this->inactivityTimeout = (integer)$settings['session']['inactivityTimeout'];
     }
 
@@ -298,7 +300,6 @@ class Session implements CookieEnabledInterface
      *
      * @return void
      * @throws \Exception
-     * @deprecated This method is not deprecated, but be aware that from next major a cookie will no longer be auto generated.
      * @see CookieEnabledInterface
      * @api
      */
@@ -307,7 +308,7 @@ class Session implements CookieEnabledInterface
         if ($this->started === false) {
             $this->sessionIdentifier = Algorithms::generateRandomString(32);
             $this->storageIdentifier = Algorithms::generateUUID();
-            $this->sessionCookie = new Cookie($this->sessionCookieName, $this->sessionIdentifier, 0, $this->sessionCookieLifetime, $this->sessionCookieDomain, $this->sessionCookiePath, $this->sessionCookieSecure, $this->sessionCookieHttpOnly);
+            $this->sessionCookie = new Cookie($this->sessionCookieName, $this->sessionIdentifier, 0, $this->sessionCookieLifetime, $this->sessionCookieDomain, $this->sessionCookiePath, $this->sessionCookieSecure, $this->sessionCookieHttpOnly, $this->sessionCookieSameSite);
             $this->lastActivityTimestamp = $this->now;
             $this->started = true;
 
@@ -333,7 +334,12 @@ class Session implements CookieEnabledInterface
         if ($this->sessionCookie === null || $this->started === true) {
             return false;
         }
-        $sessionMetaData = $this->metaDataCache->get($this->sessionCookie->getValue());
+        $sessionIdentifier = $this->sessionCookie->getValue();
+        if ($this->metaDataCache->isValidEntryIdentifier($sessionIdentifier) === false) {
+            $this->logger->warning('SESSION IDENTIFIER INVALID: ' . $sessionIdentifier, LogEnvironment::fromMethodName(__METHOD__));
+            return false;
+        }
+        $sessionMetaData = $this->metaDataCache->get($sessionIdentifier);
         if ($sessionMetaData === false) {
             return false;
         }
@@ -610,50 +616,16 @@ class Session implements CookieEnabledInterface
      * Iterates over all existing sessions and removes their data if the inactivity
      * timeout was reached.
      *
-     * @return integer The number of outdated entries removed
+     * @return integer The number of outdated entries removed or NULL if no such information could be determined
+     * @deprecated will be removed with Flow 9, use SessionManager->collectGarbage
      * @throws \Neos\Cache\Exception
      * @throws NotSupportedByBackendException
      * @api
      */
     public function collectGarbage()
     {
-        if ($this->inactivityTimeout === 0) {
-            return 0;
-        }
-        if ($this->metaDataCache->has('_garbage-collection-running')) {
-            return false;
-        }
-
-        $sessionRemovalCount = 0;
-        $this->metaDataCache->set('_garbage-collection-running', true, [], 120);
-
-        foreach ($this->metaDataCache->getIterator() as $sessionIdentifier => $sessionInfo) {
-            if ($sessionIdentifier === '_garbage-collection-running') {
-                continue;
-            }
-            if (!is_array($sessionInfo)) {
-                $sessionInfo = [
-                    'sessionMetaData' => $sessionInfo,
-                    'lastActivityTimestamp' => 0,
-                    'storageIdentifier' => null
-                ];
-                $this->logger->warning('SESSION INFO INVALID: ' . $sessionIdentifier, $sessionInfo + LogEnvironment::fromMethodName(__METHOD__));
-            }
-            $lastActivitySecondsAgo = $this->now - $sessionInfo['lastActivityTimestamp'];
-            if ($lastActivitySecondsAgo > $this->inactivityTimeout) {
-                if ($sessionInfo['storageIdentifier'] !== null) {
-                    $this->storageCache->flushByTag($sessionInfo['storageIdentifier']);
-                    $sessionRemovalCount++;
-                }
-                $this->metaDataCache->remove($sessionIdentifier);
-            }
-            if ($sessionRemovalCount >= $this->garbageCollectionMaximumPerRun) {
-                break;
-            }
-        }
-
-        $this->metaDataCache->remove('_garbage-collection-running');
-        return $sessionRemovalCount;
+        $result = $this->sessionManager->collectGarbage();
+        return is_null($result) ? 0 : $result;
     }
 
     /**
@@ -683,12 +655,6 @@ class Session implements CookieEnabledInterface
                 $this->writeSessionMetaDataCacheEntry();
             }
             $this->started = false;
-
-            $decimals = (integer)strlen(strrchr($this->garbageCollectionProbability, '.')) - 1;
-            $factor = ($decimals > -1) ? $decimals * 10 : 1;
-            if (rand(1, 100 * $factor) <= ($this->garbageCollectionProbability * $factor)) {
-                $this->collectGarbage();
-            }
         }
     }
 

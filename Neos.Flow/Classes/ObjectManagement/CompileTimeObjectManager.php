@@ -228,6 +228,12 @@ class CompileTimeObjectManager extends ObjectManager
                 }
                 if ($package instanceof FlowPackageInterface && $shouldRegisterFunctionalTestClasses) {
                     foreach ($package->getFunctionalTestsClassFiles() as $fullClassName => $path) {
+                        if (version_compare(PHP_VERSION, '8.0', '<=') && strpos($fullClassName, '\\PHP8\\') !== false) {
+                            continue;
+                        }
+                        if (version_compare(PHP_VERSION, '8.1', '<=') && strpos($fullClassName, '\\PHP81\\') !== false) {
+                            continue;
+                        }
                         if (substr($fullClassName, -9, 9) !== 'Exception') {
                             $availableClassNames[$packageKey][] = $fullClassName;
                         }
@@ -308,6 +314,7 @@ class CompileTimeObjectManager extends ObjectManager
     protected function buildObjectsArray()
     {
         $objects = [];
+        /* @var $objectConfiguration Configuration */
         foreach ($this->objectConfigurations as $objectConfiguration) {
             $objectName = $objectConfiguration->getObjectName();
             $objects[$objectName] = [
@@ -318,14 +325,14 @@ class CompileTimeObjectManager extends ObjectManager
             if ($objectConfiguration->getClassName() !== $objectName) {
                 $objects[$objectName]['c'] = $objectConfiguration->getClassName();
             }
-            if ($objectConfiguration->getFactoryObjectName() !== '') {
+            if ($objectConfiguration->isCreatedByFactory()) {
                 $objects[$objectName]['f'] = [
                     $objectConfiguration->getFactoryObjectName(),
                     $objectConfiguration->getFactoryMethodName()
                 ];
 
                 $objects[$objectName]['fa'] = [];
-                $factoryMethodArguments = $objectConfiguration->getArguments();
+                $factoryMethodArguments = $objectConfiguration->getFactoryArguments();
                 if (count($factoryMethodArguments) > 0) {
                     foreach ($factoryMethodArguments as $index => $argument) {
                         $objects[$objectName]['fa'][$index] = [

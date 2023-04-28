@@ -42,6 +42,10 @@ class Cookie
      */
     const PATTERN_PATH = '/^([\x20-\x3A\x3C-\x7E])+$/';
 
+    const SAMESITE_NONE = 'none';
+    const SAMESITE_LAX = 'lax';
+    const SAMESITE_STRICT = 'strict';
+
     /**
      * Cookie Name, a token (RFC 6265, 4.1.1)
      * @var string
@@ -87,6 +91,23 @@ class Cookie
     protected $httpOnly;
 
     /**
+     * Possible values: none, lax, or strict (RFC 6265bis-05, 8.8)
+     *
+     * sameSite=strict
+     *   Cookie will only be sent in a first-party context, cookie is ignored on the initial request to your site.
+     *   This is a good setting when you have cookies relating to functionality, such as changing a password
+     * sameSite=lax
+     *   Cookie will only be sent in a top-level navigations.
+     *   This is a good setting when you need the cookie on the initial request, such as session login via cookie
+     * sameSite=none
+     *   Cookie will be sent in a third-party context.
+     *   This is a good setting when you need the cookie in cors ajax request, such as providing an api with session login via cookie
+     *
+     * @var string
+     */
+    protected $sameSite;
+
+    /**
      * Constructs a new Cookie object
      *
      * @param string $name The cookie name as a valid token (RFC 2616)
@@ -97,10 +118,11 @@ class Cookie
      * @param string $path The path describing the scope of this cookie
      * @param boolean $secure If this cookie should only be sent through a "secure" channel by the user agent
      * @param boolean $httpOnly If this cookie should only be used through the HTTP protocol
+     * @param string $sameSite If this cookie should restricted to a first-party or top-level navigation or third-party context
      * @api
      * @throws \InvalidArgumentException
      */
-    public function __construct($name, $value = null, $expires = 0, $maximumAge = null, $domain = null, $path = '/', $secure = false, $httpOnly = true)
+    public function __construct($name, $value = null, $expires = 0, $maximumAge = null, $domain = null, $path = '/', $secure = false, $httpOnly = true, $sameSite = null)
     {
         if (preg_match(self::PATTERN_TOKEN, $name) !== 1) {
             throw new \InvalidArgumentException('The parameter "name" passed to the Cookie constructor must be a valid token as per RFC 2616, Section 2.2.', 1345101977);
@@ -121,14 +143,20 @@ class Cookie
             throw new \InvalidArgumentException('The parameter "path" passed to the Cookie constructor must be a valid path as per RFC 6265, Section 4.1.1.', 1345123078);
         }
 
+        $sameSite = $sameSite ?? self::SAMESITE_LAX;
+        if (!\in_array($sameSite, [self::SAMESITE_LAX, self::SAMESITE_STRICT, self::SAMESITE_NONE], true)) {
+            throw new \InvalidArgumentException('The parameter "sameSite" passed to the Cookie constructor must be a valid samesite value. Possible values are "none", "strict" and "lax"', 1584955500);
+        }
+
         $this->name = $name;
         $this->value = $value;
         $this->expiresTimestamp = $expires;
         $this->maximumAge = $maximumAge;
         $this->domain = $domain;
         $this->path = $path;
-        $this->secure = ($secure == true);
+        $this->secure = ($secure == true) || $sameSite === self::SAMESITE_NONE;
         $this->httpOnly = ($httpOnly == true);
+        $this->sameSite = $sameSite;
     }
 
     /**
@@ -165,6 +193,7 @@ class Cookie
         $pathAttribute = null;
         $secureAttribute = false;
         $httpOnlyAttribute = true;
+        $sameSite = self::SAMESITE_LAX;
 
         if ($unparsedAttributes !== '') {
             foreach (explode(';', $unparsedAttributes) as $cookieAttributeValueString) {
@@ -184,27 +213,35 @@ class Cookie
                     break;
                     case 'MAX-AGE':
                         if (preg_match(self::PATTERN_MAX_AGE, $attributeValue) === 1) {
-                            $maxAgeAttribute = intval($attributeValue);
+                            $maxAgeAttribute = (int)$attributeValue;
                         }
-                    break;
+                        break;
                     case 'DOMAIN':
                         if ($attributeValue !== '') {
                             $domainAttribute = strtolower(ltrim($attributeValue, '.'));
                         }
-                    break;
+                        break;
                     case 'PATH':
                         if ($attributeValue === '' || substr($attributeValue, 0, 1) !== '/') {
                             $pathAttribute = '/';
                         } else {
                             $pathAttribute = $attributeValue;
                         }
-                    break;
+                        break;
                     case 'SECURE':
                         $secureAttribute = true;
-                    break;
+                        break;
                     case 'HTTPONLY':
                         $httpOnlyAttribute = true;
-                    break;
+                        break;
+                    case 'SAMESITE':
+                        if (\in_array(strtolower($attributeValue), [self::SAMESITE_LAX, self::SAMESITE_STRICT, self::SAMESITE_NONE], true)) {
+                            $sameSite = strtolower($attributeValue);
+                        }
+                        if (strtolower($attributeValue) === self::SAMESITE_NONE) {
+                            $secureAttribute = true;
+                        }
+                        break;
                 }
             }
         }
@@ -217,7 +254,8 @@ class Cookie
             $domainAttribute,
             $pathAttribute,
             $secureAttribute,
-            $httpOnlyAttribute
+            $httpOnlyAttribute,
+            $sameSite
         );
 
         return $cookie;
@@ -335,6 +373,17 @@ class Cookie
     }
 
     /**
+     * Returns the SameSite of this cookie
+     *
+     * @return string|null
+     * @api
+     */
+    public function getSameSite()
+    {
+        return $this->sameSite;
+    }
+
+    /**
      * Marks this cookie for removal.
      *
      * On executing this method, the expiry time of this cookie is set to a point
@@ -369,10 +418,10 @@ class Cookie
         if ($this->value === false) {
             $value = 0;
         } else {
-            $value = $this->value;
+            $value = urlencode((string)$this->value);
         }
 
-        $cookiePair = sprintf('%s=%s', $this->name, urlencode($value));
+        $cookiePair = sprintf('%s=%s', $this->name, $value);
         $attributes = '';
 
         if ($this->expiresTimestamp !== 0) {
@@ -395,6 +444,10 @@ class Cookie
 
         if ($this->httpOnly) {
             $attributes .= '; HttpOnly';
+        }
+
+        if ($this->sameSite) {
+            $attributes .= '; SameSite=' . $this->sameSite;
         }
 
         return $cookiePair . $attributes;

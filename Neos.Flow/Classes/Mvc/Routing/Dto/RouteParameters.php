@@ -26,13 +26,12 @@ use Neos\Utility\TypeHandling;
  */
 final class RouteParameters implements CacheAwareInterface
 {
-
     /**
      * The parameters as simple key/value pair in the format ['<parameter1Key>' => <parameter1Value>, ...]
      *
      * @var array
      */
-    private $parameters = [];
+    private $parameters;
 
     /**
      * @param array $parameters simple key/value pair in the format ['<parameter1Key>' => <parameter1Value>, ...]
@@ -89,6 +88,22 @@ final class RouteParameters implements CacheAwareInterface
     public function getValue(string $parameterName)
     {
         return $this->parameters[$parameterName] ?? null;
+    }
+
+    /**
+     * @return bool
+     */
+    public function isEmpty(): bool
+    {
+        return $this->parameters === [];
+    }
+
+    /**
+     * @return array
+     */
+    public function toArray(): array
+    {
+        return $this->parameters;
     }
 
     /**

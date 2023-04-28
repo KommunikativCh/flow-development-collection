@@ -23,7 +23,6 @@ use Psr\Http\Message\ServerRequestInterface;
  */
 final class RouteContext implements CacheAwareInterface
 {
-
     /**
      * The current HTTP request
      *
@@ -75,7 +74,8 @@ final class RouteContext implements CacheAwareInterface
     public function getCacheEntryIdentifier(): string
     {
         if ($this->cacheEntryIdentifier === null) {
-            $this->cacheEntryIdentifier = md5(sprintf('host:%s|path:%s|method:%s|parameters:%s',
+            $this->cacheEntryIdentifier = md5(sprintf(
+                'host:%s|path:%s|method:%s|parameters:%s',
                 $this->httpRequest->getUri()->getHost(),
                 RequestInformationHelper::getRelativeRequestPath($this->httpRequest),
                 $this->httpRequest->getMethod(),

@@ -42,7 +42,6 @@ use TYPO3Fluid\Fluid\Core\Rendering\RenderingContextInterface;
  */
 class IfHasErrorsViewHelper extends AbstractConditionViewHelper
 {
-
     /**
      * @return void
      * @throws \Neos\FluidAdaptor\Core\ViewHelper\Exception
@@ -76,7 +75,7 @@ class IfHasErrorsViewHelper extends AbstractConditionViewHelper
      * @param FlowAwareRenderingContextInterface|RenderingContextInterface $renderingContext
      * @return boolean
      */
-    protected static function evaluateCondition($arguments = null, RenderingContextInterface $renderingContext)
+    protected static function evaluateCondition($arguments, RenderingContextInterface $renderingContext)
     {
         /** @var ActionRequest $request */
         /** @var FlowAwareRenderingContextInterface $renderingContext */

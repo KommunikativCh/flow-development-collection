@@ -13,7 +13,7 @@
       <!-- CollectionValidator -->
       <trans-unit id="1317204797" xml:space="preserve" approved="yes">
 				<source>The given subject is not a collection</source>
-			<target state="final">Podany element nie jest kolekcją</target><alt-trans><target>Podany element nie jest zbiorem</target></alt-trans></trans-unit>
+			<target state="final">Podany element nie jest kolekcją</target></trans-unit>
       <!-- CountValidator -->
       <trans-unit id="1253718666" xml:space="preserve" approved="yes">
 				<source>The given subject is not countable</source>
@@ -80,10 +80,10 @@
       <!-- NotEmptyValidator -->
       <trans-unit id="1221560910" xml:space="preserve" approved="yes">
 				<source>This property is required</source>
-			<target state="final">To pole jest wymagane</target><alt-trans><target>Ta właściwość jest wymagana</target></alt-trans></trans-unit>
+			<target state="final">To pole jest wymagane</target></trans-unit>
       <trans-unit id="1221560718" xml:space="preserve" approved="yes">
 				<source>This property is required</source>
-			<target state="final">To pole jest wymagane</target><alt-trans><target>Ta właściwość jest wymagana</target></alt-trans></trans-unit>
+			<target state="final">To pole jest wymagane</target></trans-unit>
       <!-- NumberRangeValidator -->
       <trans-unit id="1221563685" xml:space="preserve" approved="yes">
 				<source>A valid number is expected</source>
@@ -116,39 +116,39 @@
 				<source>The length of this text must be between {0,number} and {1,number} characters</source>
 			<target state="final">Długość tego tekstu musi być pomiędzy {0,number} a {1,number} znaków</target></trans-unit>
       <group id="1238108068" restype="x-gettext-plurals">
-        <trans-unit id="1238108068[0]">
+        <trans-unit id="1238108068[0]" approved="yes">
           <source>This field must contain at least {0,number} character</source>
-          <target state="translated">To pole musi zawierać co najmniej {0,number} znak</target>
+          <target state="final">To pole musi zawierać co najmniej {0,number} znak</target>
         </trans-unit>
-        <trans-unit id="1238108068[1]">
+        <trans-unit id="1238108068[1]" approved="yes">
           <source>This field must contain at least {0,number} characters</source>
-          <target state="translated">To pole musi zawierać co najmniej {0,number} znaki</target>
+          <target state="final">To pole musi zawierać co najmniej {0,number} znaki</target>
         </trans-unit>
         <trans-unit id="1238108068[2]">
           <source>This field must contain at least {0,number} characters</source>
           <target state="translated">To pole musi zawierać co najmniej {0,number} znaków</target>
         </trans-unit>
-        <trans-unit id="1238108068[3]">
+        <trans-unit id="1238108068[3]" approved="yes">
           <source>This field must contain at least {0,number} characters</source>
-          <target state="translated">To pole musi zawierać co najmniej {0,number} znaków</target>
+          <target state="final">To pole musi zawierać co najmniej {0,number} znaków</target>
         </trans-unit>
       </group>
       <group id="1238108069" restype="x-gettext-plurals">
-        <trans-unit id="1238108069[0]">
+        <trans-unit id="1238108069[0]" approved="yes">
           <source>This text may not exceed {0,number} character</source>
-          <target state="translated">Ten tekst nie może przekraczać {0,number} znaku</target>
+          <target state="final">Ten tekst nie może przekraczać {0,number} znaku</target>
         </trans-unit>
-        <trans-unit id="1238108069[1]">
+        <trans-unit id="1238108069[1]" approved="yes">
           <source>This text may not exceed {0,number} characters</source>
-          <target state="translated">Ten tekst nie może przekraczać {0,number} znaków</target>
+          <target state="final">Ten tekst nie może przekraczać {0,number} znaków</target>
         </trans-unit>
         <trans-unit id="1238108069[2]">
           <source>This text may not exceed {0,number} characters</source>
           <target state="translated">Ten tekst nie może przekraczać {0,number} znaków</target>
         </trans-unit>
-        <trans-unit id="1238108069[3]">
+        <trans-unit id="1238108069[3]" approved="yes">
           <source>This text may not exceed {0,number} characters</source>
-          <target state="translated">Ten tekst nie może przekraczać {0,number} znaków</target>
+          <target state="final">Ten tekst nie może przekraczać {0,number} znaków</target>
         </trans-unit>
       </group>
       <!-- StringValidator -->

@@ -49,8 +49,8 @@ class MediaTypeConverter extends AbstractTypeConverter implements MediaTypeConve
      * @param string $source the raw request body
      * @param string $targetType must be "array"
      * @param array $convertedChildProperties
-     * @param PropertyMappingConfigurationInterface $configuration
-     * @return array
+     * @param PropertyMappingConfigurationInterface|null $configuration
+     * @return array|string|integer Note that this TypeConverter may return a non-array in case of JSON media type, even though he declares to only convert to array
      * @api
      */
     public function convertFrom($source, $targetType, array $convertedChildProperties = [], PropertyMappingConfigurationInterface $configuration = null)
@@ -71,7 +71,7 @@ class MediaTypeConverter extends AbstractTypeConverter implements MediaTypeConve
      *
      * @param string $requestBody the raw request body
      * @param string $mediaType the configured media type (for example "application/json")
-     * @return array
+     * @return array|string|integer
      * @api
      */
     protected function convertMediaType($requestBody, $mediaType)
@@ -90,22 +90,29 @@ class MediaTypeConverter extends AbstractTypeConverter implements MediaTypeConve
                 if ($result === null) {
                     return [];
                 }
-            break;
+                break;
             case 'xml':
-                $entityLoaderValue = libxml_disable_entity_loader(true);
+                // TODO: Remove those lines once the minimum PHP version is 8.0
+                if (PHP_MAJOR_VERSION < 8) {
+                    $entityLoaderValue = libxml_disable_entity_loader(true);
+                }
                 try {
                     $xmlElement = new \SimpleXMLElement(urldecode($requestBody), LIBXML_NOERROR);
-                    libxml_disable_entity_loader($entityLoaderValue);
+                    if (PHP_MAJOR_VERSION < 8) {
+                        libxml_disable_entity_loader($entityLoaderValue);
+                    }
                 } catch (\Exception $exception) {
-                    libxml_disable_entity_loader($entityLoaderValue);
+                    if (PHP_MAJOR_VERSION < 8) {
+                        libxml_disable_entity_loader($entityLoaderValue);
+                    }
                     return [];
                 }
                 $result = Arrays::convertObjectToArray($xmlElement);
-            break;
+                break;
             case 'x-www-form-urlencoded':
             default:
                 parse_str($requestBody, $result);
-            break;
+                break;
         }
         return $result;
     }

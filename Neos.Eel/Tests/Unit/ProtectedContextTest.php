@@ -77,12 +77,12 @@ class ProtectedContextTest extends UnitTestCase
     /**
      * @test
      */
-    public function methodCallToWhitelistedValueIsAllowed()
+    public function methodCallToAllowedValueIsAllowed()
     {
         $context = new ProtectedContext([
             'String' => new \Neos\Eel\Helper\StringHelper()
         ]);
-        $context->whitelist('String.*');
+        $context->allow('String.*');
 
         $evaluator = $this->createEvaluator();
 
@@ -94,7 +94,7 @@ class ProtectedContextTest extends UnitTestCase
     /**
      * @test
      */
-    public function firstLevelFunctionsHaveToBeWhitelisted()
+    public function firstLevelFunctionsHaveToBeAllowed()
     {
         $this->expectException(NotAllowedException::class);
         $context = new ProtectedContext([
@@ -113,7 +113,6 @@ class ProtectedContextTest extends UnitTestCase
      */
     public function resultOfFirstLevelMethodCallIsProtected()
     {
-        $this->expectException(NotAllowedException::class);
         $securedObject = new TestObject();
 
         $context = new ProtectedContext([
@@ -122,22 +121,22 @@ class ProtectedContextTest extends UnitTestCase
             },
             'value' => $securedObject
         ]);
-        $context->whitelist(['ident']);
+        $context->allow(['ident']);
 
         $evaluator = $this->createEvaluator();
 
         $result = $evaluator->evaluate('ident(value)', $context);
         self::assertEquals($securedObject, $result);
 
+        $this->expectException(NotAllowedException::class);
         $evaluator->evaluate('ident(value).callMe("Foo")', $context);
     }
 
     /**
      * @test
      */
-    public function resultOfWhitelistedMethodCallIsProtected()
+    public function resultOfAllowedMethodCallIsProtected()
     {
-        $this->expectException(NotAllowedException::class);
         $securedObject = new TestObject();
 
         $context = new ProtectedContext([
@@ -148,13 +147,14 @@ class ProtectedContextTest extends UnitTestCase
             ],
             'value' => [$securedObject]
         ]);
-        $context->whitelist('Array');
+        $context->allow('Array.*');
 
         $evaluator = $this->createEvaluator();
 
         $result = $evaluator->evaluate('Array.reverse(value)[0]', $context);
         self::assertEquals($securedObject, $result);
 
+        $this->expectException(NotAllowedException::class);
         $evaluator->evaluate('Array.reverse(value)[0].callMe("Foo")', $context);
     }
 
@@ -169,12 +169,12 @@ class ProtectedContextTest extends UnitTestCase
                 $context = new ProtectedContext(['count' => function () use ($value) {
                     return count($value);
                 }]);
-                $context->whitelist('*');
+                $context->allow('*');
                 return $context;
             },
             'value' => ['Foo', 'Bar']
         ]);
-        $context->whitelist('q');
+        $context->allow('q');
 
         $evaluator = $this->createEvaluator();
 
@@ -185,7 +185,7 @@ class ProtectedContextTest extends UnitTestCase
     /**
      * @test
      */
-    public function protectedContextAwareInterfaceAllowsCallsDynamicallyWithoutWhitelist()
+    public function protectedContextAwareInterfaceAllowsCallsDynamicallyWithoutAllowlist()
     {
         $securedObject = new TestObject();
 

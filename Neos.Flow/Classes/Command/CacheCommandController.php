@@ -146,7 +146,6 @@ class CacheCommandController extends CommandController
      */
     public function flushCommand(bool $force = false)
     {
-
         // Internal note: the $force option is evaluated early in the Flow
         // bootstrap in order to reliably flush the temporary data before any
         // other code can cause fatal errors.
@@ -247,7 +246,7 @@ class CacheCommandController extends CommandController
      * @param bool $quiet If set, this command only outputs errors & warnings
      * @return void
      * @see neos.flow:cache:show
-     * @throws NoSuchCacheException | StopActionException
+     * @throws NoSuchCacheException|StopActionException
      */
     public function listCommand(bool $quiet = false)
     {
@@ -391,7 +390,7 @@ class CacheCommandController extends CommandController
      * @param bool $quiet If set, this command only outputs errors & warnings
      * @return void
      * @see neos.flow:cache:setup
-     * @throws NoSuchCacheException | StopActionException
+     * @throws NoSuchCacheException|StopActionException
      */
     public function setupAllCommand(bool $quiet = false)
     {
@@ -415,6 +414,40 @@ class CacheCommandController extends CommandController
         if ($hasErrorsOrWarnings) {
             $this->quit(1);
             return;
+        }
+    }
+
+    /**
+     * Cache Garbage Collection
+     *
+     * Runs the Garbage Collection (collectGarbage) method on all registered caches.
+     *
+     * Though the method is defined in the BackendInterface, the implementation
+     * can differ and might not remove any data, depending on possibilities of
+     * the backend.
+     *
+     * @param string $cacheIdentifier If set, this command only applies to the given cache
+     * @return void
+     * @throws NoSuchCacheException
+     */
+    public function collectGarbageCommand(string $cacheIdentifier = null): void
+    {
+        if ($cacheIdentifier !== null) {
+            $cache = $this->cacheManager->getCache($cacheIdentifier);
+            $cache->collectGarbage();
+
+            $this->outputLine('<success>Garbage Collection for cache "%s" completed</success>', [$cacheIdentifier]);
+        } else {
+            $cacheConfigurations = $this->cacheManager->getCacheConfigurations();
+            unset($cacheConfigurations['Default']);
+            ksort($cacheConfigurations);
+
+            foreach ($cacheConfigurations as $identifier => $configuration) {
+                $this->outputLine('Garbage Collection for cache "%s"', [$identifier]);
+                $cache = $this->cacheManager->getCache($identifier);
+                $cache->collectGarbage();
+                $this->outputLine('<success>Completed</success>');
+            }
         }
     }
 

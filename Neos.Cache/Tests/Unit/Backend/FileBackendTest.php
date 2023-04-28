@@ -14,6 +14,7 @@ include_once(__DIR__ . '/../../BaseTestCase.php');
  */
 
 use Neos\Cache\Backend\FileBackend;
+use Neos\Cache\Backend\FileBackendEntryDto;
 use Neos\Cache\EnvironmentConfiguration;
 use Neos\Cache\Exception;
 use Neos\Cache\Tests\BaseTestCase;
@@ -21,8 +22,7 @@ use org\bovigo\vfs\vfsStream;
 use Neos\Cache\Frontend\AbstractFrontend;
 use Neos\Cache\Frontend\PhpFrontend;
 use Neos\Cache\Frontend\VariableFrontend;
-use PHPUnit\Framework\Error\Notice;
-use PHPUnit\Framework\Error\Warning;
+use PHPUnit\Framework\MockObject\MockObject;
 
 /**
  * Test case for the cache to file backend
@@ -104,7 +104,6 @@ class FileBackendTest extends BaseTestCase
      */
     public function aDedicatedCacheDirectoryIsUsedForCodeCaches()
     {
-
         // We need to create the directory here because vfs doesn't support touch() which is used by
         // createDirectoryRecursively() in the setCache method.
         mkdir('vfs://Foo/Cache');
@@ -134,7 +133,7 @@ class FileBackendTest extends BaseTestCase
         $backend->set($entryIdentifier, $data);
 
         self::assertFileExists($pathAndFilename);
-        $retrievedData = file_get_contents($pathAndFilename, null, null, 0, strlen($data));
+        $retrievedData = file_get_contents($pathAndFilename, false, null, 0, strlen($data));
         self::assertEquals($data, $retrievedData);
     }
 
@@ -158,7 +157,7 @@ class FileBackendTest extends BaseTestCase
 
         $pathAndFilename = 'vfs://Foo/Cache/Data/UnitTestCache/' . $entryIdentifier;
         self::assertFileExists($pathAndFilename);
-        $retrievedData = file_get_contents($pathAndFilename, null, null, 0, strlen($data2));
+        $retrievedData = file_get_contents($pathAndFilename, false, null, 0, strlen($data2));
         self::assertEquals($data2, $retrievedData);
     }
 
@@ -180,7 +179,7 @@ class FileBackendTest extends BaseTestCase
 
         $pathAndFilename = 'vfs://Foo/Cache/Data/UnitTestCache/' . $entryIdentifier;
         self::assertFileExists($pathAndFilename);
-        $retrievedData = file_get_contents($pathAndFilename, null, null, strlen($data), 9);
+        $retrievedData = file_get_contents($pathAndFilename, false, null, strlen($data), 9);
         self::assertEquals('Tag1 Tag2', $retrievedData);
     }
 
@@ -294,35 +293,38 @@ class FileBackendTest extends BaseTestCase
         $mockCache = $this->createMock(AbstractFrontend::class);
         $mockCache->expects(self::atLeastOnce())->method('getIdentifier')->will(self::returnValue('UnitTestCache'));
 
-        $backend = $this->prepareDefaultBackend(['isCacheFileExpired'], [
+        $backend = $this->prepareDefaultBackend(['dummy'], [
             __DIR__ . '~Testing',
             'vfs://Foo/',
             255
         ]);
 
-        $backend->expects(self::once())->method('isCacheFileExpired')->with('vfs://Foo/Cache/Data/UnitTestCache/ExpiredEntry')->will(self::returnValue(true));
+        $entryIdentifier = 'ExpiredEntry';
+        $pathAndFilename = 'vfs://Foo/Cache/Data/UnitTestCache/' . $entryIdentifier;
+        $entryDto = new FileBackendEntryDto('data', [], time() - 5);
         $backend->setCache($mockCache);
+        file_put_contents($pathAndFilename, (string)$entryDto);
 
-        self::assertFalse($backend->get('ExpiredEntry'));
+        self::assertFalse($backend->get($entryIdentifier));
     }
 
     /**
      * @test
      */
-    public function getDoesNotCheckIfAnEntryIsExpiredIfTheCacheIsFrozen()
+    public function getDoesUseInternalGetIfTheCacheIsFrozen()
     {
         $mockCache = $this->createMock(AbstractFrontend::class);
         $mockCache->expects(self::atLeastOnce())->method('getIdentifier')->will(self::returnValue('UnitTestCache'));
-
-        $backend = $this->prepareDefaultBackend(['isCacheFileExpired'], [
+        /** @var MockObject $backend */
+        $backend = $this->prepareDefaultBackend(['internalGet'], [
             __DIR__ . '~Testing',
             'vfs://Foo/',
             255
         ]);
 
+        // used in freeze()
+        $backend->expects(self::once())->method('internalGet')->willReturn('some data');
         $backend->setCache($mockCache);
-        $backend->expects(self::once())->method('isCacheFileExpired');
-
         $backend->set('foo', 'some data');
         $backend->freeze();
         self::assertEquals('some data', $backend->get('foo'));
@@ -376,7 +378,7 @@ class FileBackendTest extends BaseTestCase
         ]);
         $backend->setCache($mockCache);
 
-        $backend->expects(self::once())->method('isCacheFileExpired'); // Indirectly called by freeze() -> get()
+        $backend->expects(self::never())->method('isCacheFileExpired');
 
         $backend->set('foo', 'some data');
         $backend->freeze();
@@ -404,7 +406,7 @@ class FileBackendTest extends BaseTestCase
         self::assertFileExists($pathAndFilename);
 
         $backend->remove($entryIdentifier);
-        self::assertFileNotExists($pathAndFilename);
+        self::assertFileDoesNotExist($pathAndFilename);
     }
 
     /**
@@ -533,7 +535,7 @@ class FileBackendTest extends BaseTestCase
         $backend = $this->prepareDefaultBackend(['isCacheFileExpired']);
         $backend->setCache($mockCache);
 
-        $backend->expects(self::once())->method('isCacheFileExpired'); // Indirectly called by freeze() -> get()
+        $backend->expects(self::never())->method('isCacheFileExpired');
 
         $data = '<?php return "foo"; ?>';
         $backend->set('FooEntry', $data);
@@ -566,7 +568,7 @@ class FileBackendTest extends BaseTestCase
      */
     public function requireOnceDoesNotSwallowPhpWarningsOfTheIncludedFile()
     {
-        $this->expectException(Warning::class);
+        $this->expectWarning();
         $mockCache = $this->createMock(AbstractFrontend::class);
         $mockCache->expects(self::atLeastOnce())->method('getIdentifier')->will(self::returnValue('UnitTestCache'));
 
@@ -574,7 +576,7 @@ class FileBackendTest extends BaseTestCase
         $backend->setCache($mockCache);
 
         $entryIdentifier = 'SomePhpEntryWithPhpWarning';
-        $backend->set($entryIdentifier, '<?php trigger_error("Warning!", E_WARNING); ?>');
+        $backend->set($entryIdentifier, '<?php trigger_error("Warning!", E_USER_WARNING); ?>');
         $backend->requireOnce($entryIdentifier);
     }
 
@@ -583,7 +585,7 @@ class FileBackendTest extends BaseTestCase
      */
     public function requireOnceDoesNotSwallowPhpNoticesOfTheIncludedFile()
     {
-        $this->expectException(Notice::class);
+        $this->expectNotice();
         $mockCache = $this->createMock(AbstractFrontend::class);
         $mockCache->expects(self::atLeastOnce())->method('getIdentifier')->will(self::returnValue('UnitTestCache'));
 
@@ -591,7 +593,7 @@ class FileBackendTest extends BaseTestCase
         $backend->setCache($mockCache);
 
         $entryIdentifier = 'SomePhpEntryWithPhpNotice';
-        $backend->set($entryIdentifier, '<?php $undefined ++; ?>');
+        $backend->set($entryIdentifier, '<?php trigger_error("Notice!", E_USER_NOTICE); ?>');
         $backend->requireOnce($entryIdentifier);
     }
 
@@ -659,8 +661,8 @@ class FileBackendTest extends BaseTestCase
 
         $backend->flush();
 
-        self::assertFileNotExists('vfs://Foo/Cache/Data/UnitTestCache/BackendFileTest1');
-        self::assertFileNotExists('vfs://Foo/Cache/Data/UnitTestCache/BackendFileTest2');
+        self::assertFileDoesNotExist('vfs://Foo/Cache/Data/UnitTestCache/BackendFileTest1');
+        self::assertFileDoesNotExist('vfs://Foo/Cache/Data/UnitTestCache/BackendFileTest2');
     }
 
     /**
@@ -668,14 +670,25 @@ class FileBackendTest extends BaseTestCase
      */
     public function flushByTagRemovesCacheEntriesWithSpecifiedTag()
     {
-        $backend = $this->prepareDefaultBackend(['findIdentifiersByTag', 'remove']);
+        $backend = $this->prepareDefaultBackend(['findIdentifiersByTags', 'remove']);
 
-        $backend->expects(self::once())->method('findIdentifiersByTag')->with('UnitTestTag%special')->will(self::returnValue(['foo', 'bar', 'baz']));
-        $backend->expects(self::at(1))->method('remove')->with('foo');
-        $backend->expects(self::at(2))->method('remove')->with('bar');
-        $backend->expects(self::at(3))->method('remove')->with('baz');
+        $backend->expects(self::once())->method('findIdentifiersByTags')->with(['UnitTestTag%special'])->will(self::returnValue(['foo', 'bar', 'baz']));
+        $backend->expects(self::atLeast(3))->method('remove')->withConsecutive(['foo'], ['bar'], ['baz']);
 
         $backend->flushByTag('UnitTestTag%special');
+    }
+
+    /**
+     * @test
+     */
+    public function flushByTagsRemovesCacheEntriesWithSpecifiedTags()
+    {
+        $backend = $this->prepareDefaultBackend(['findIdentifiersByTags', 'remove']);
+
+        $backend->expects(self::once())->method('findIdentifiersByTags')->with(['UnitTestTag%special'])->will(self::returnValue(['foo', 'bar', 'baz']));
+        $backend->expects(self::atLeast(3))->method('remove')->withConsecutive(['foo'], ['bar'], ['baz']);
+
+        $backend->flushByTags(['UnitTestTag%special']);
     }
 
     /**
@@ -698,7 +711,7 @@ class FileBackendTest extends BaseTestCase
         self::assertFileExists('vfs://Foo/Cache/Data/UnitTestCache/BackendFileTest2');
 
         $backend->collectGarbage();
-        self::assertFileNotExists('vfs://Foo/Cache/Data/UnitTestCache/BackendFileTest1');
+        self::assertFileDoesNotExist('vfs://Foo/Cache/Data/UnitTestCache/BackendFileTest1');
         self::assertFileExists('vfs://Foo/Cache/Data/UnitTestCache/BackendFileTest2');
     }
 
