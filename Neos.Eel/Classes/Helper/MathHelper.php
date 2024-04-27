@@ -94,10 +94,13 @@ class MathHelper implements ProtectedContextAwareInterface
      * @param float $x A number
      * @return float The absolute value of the given value
      */
-    public function abs($x = 'NAN')
+    public function abs($x = NAN)
     {
         if (!is_numeric($x) && $x !== null) {
             return NAN;
+        }
+        if ($x === null) {
+            return 0.0;
         }
         return abs((float)$x);
     }
@@ -418,7 +421,7 @@ class MathHelper implements ProtectedContextAwareInterface
      * Get the sign of the given number, indicating whether the number is positive, negative or zero
      *
      * @param integer|float $x The value
-     * @return integer -1, 0, 1 depending on the sign or NAN if the given value was not numeric
+     * @return integer|float -1, 0, 1 depending on the sign or NAN if the given value was not numeric
      */
     public function sign($x)
     {
@@ -490,14 +493,11 @@ class MathHelper implements ProtectedContextAwareInterface
     public function trunc($x)
     {
         $sign = $this->sign($x);
-        switch ($sign) {
-            case -1:
-                return (int)ceil((float)$x);
-            case 1:
-                return (int)floor((float)$x);
-            default:
-                return $sign;
-        }
+        return match ($sign) {
+            -1 => (int)ceil((float)$x),
+            1 => (int)floor((float)$x),
+            default => $sign,
+        };
     }
 
     /**

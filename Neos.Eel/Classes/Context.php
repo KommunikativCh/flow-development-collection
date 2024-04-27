@@ -21,6 +21,7 @@ use Neos\Utility\ObjectAccess;
  * It works as a variable container with wrapping of return values
  * for safe access without warnings (on missing properties).
  *
+ * @phpstan-consistent-constructor
  * @Flow\Proxy(false)
  */
 class Context
@@ -198,16 +199,5 @@ class Context
             $this->value[$key] = $value;
         }
         return $this;
-    }
-
-    /**
-     * @return string
-     */
-    public function __toString()
-    {
-        if (is_object($this->value) && !method_exists($this->value, '__toString')) {
-            return '[object ' . get_class($this->value) . ']';
-        }
-        return (string)$this->value;
     }
 }

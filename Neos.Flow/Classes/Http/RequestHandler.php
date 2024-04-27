@@ -161,7 +161,7 @@ class RequestHandler implements HttpRequestHandlerInterface
      */
     protected function sendResponse(ResponseInterface $response)
     {
-        ob_implicit_flush(1);
+        ob_implicit_flush();
         foreach (ResponseInformationHelper::prepareHeaders($response) as $prepareHeader) {
             header($prepareHeader, false);
         }
@@ -171,12 +171,6 @@ class RequestHandler implements HttpRequestHandlerInterface
             ob_end_flush();
         }
 
-        $body = $response->getBody()->detach() ?: $response->getBody()->getContents();
-        if (is_resource($body)) {
-            fpassthru($body);
-            fclose($body);
-        } else {
-            echo $body;
-        }
+        ResponseInformationHelper::sendStream($response->getBody());
     }
 }

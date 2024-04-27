@@ -264,7 +264,7 @@ class FilterOperation extends AbstractOperation
                     }
                     return false;
                 } else {
-                    return strripos($value, (string)$operand) === strlen($value) - strlen($operand);
+                    return strripos((string)$value, (string)$operand) === strlen((string)$value) - strlen((string)$operand);
                 }
                 // no break
             case '^=':
@@ -341,7 +341,7 @@ class FilterOperation extends AbstractOperation
 
     /**
      * @param string $operand
-     * @param string $value
+     * @param mixed $value
      * @return boolean true if $value is of type $operand; false otherwise
      */
     protected function handleSimpleTypeOperand($operand, $value)

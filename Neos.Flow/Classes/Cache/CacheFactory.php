@@ -39,13 +39,6 @@ class CacheFactory extends \Neos\Cache\CacheFactory
     protected $context;
 
     /**
-     * A reference to the cache manager
-     *
-     * @var CacheManager
-     */
-    protected $cacheManager;
-
-    /**
      * @var Environment
      */
     protected $environment;
@@ -56,19 +49,11 @@ class CacheFactory extends \Neos\Cache\CacheFactory
     protected $environmentConfiguration;
 
     /**
-     * @param CacheManager $cacheManager
-     * @Flow\Autowiring(enabled=false)
-     */
-    public function injectCacheManager(CacheManager $cacheManager)
-    {
-        $this->cacheManager = $cacheManager;
-    }
-
-    /**
      * @param EnvironmentConfiguration $environmentConfiguration
-     * @Flow\Autowiring(enabled=false)
+     *
+     * @Flow\Autowiring (enabled=false)
      */
-    public function injectEnvironmentConfiguration(EnvironmentConfiguration $environmentConfiguration)
+    public function injectEnvironmentConfiguration(EnvironmentConfiguration $environmentConfiguration): void
     {
         $this->environmentConfiguration = $environmentConfiguration;
     }

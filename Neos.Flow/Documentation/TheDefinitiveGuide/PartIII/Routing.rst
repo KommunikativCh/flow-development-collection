@@ -58,7 +58,7 @@ But let's start with an easy example:
 	``name`` is optional, but it's recommended to set a name for all routes to make debugging
 	easier.
 
-If you insert these lines at the beginning of the file ``Configurations/Routes.yaml``,
+If you insert these lines at the beginning of the file ``Configuration/Routes.yaml``,
 the ``indexAction`` of the ``StandardController`` in your *My.Demo* package will be called
 when you open up the homepage of your Flow installation (``http://localhost/``).
 
@@ -729,9 +729,66 @@ two more options you can use:
 With ``suffix`` you can specify a custom filename suffix for the SubRoute. The ``variables`` option allows you to
 specify placeholders in the SubRoutes (see `Nested Subroutes`_).
 
+It also is possible to specify a `providerFactory` and (optional) `providerOptions` to generate the subroutes via the
+`Neos\Flow\Mvc\Routing\RoutesProviderFactoryInterface` and the ``Neos\Flow\Mvc\Routing\RoutesProviderInterface`.
+
+.. code-block:: yaml
+
+  Neos:
+    Flow:
+      mvc:
+        routes:
+          Vendor.Example.attributes:
+            position: 'before Neos.Neos'
+            providerFactory: \Neos\Flow\Mvc\Routing\AttributeRoutesProviderFactory
+            providerOptions:
+              classNames:
+                - Vendor\Example\Controller\ExampleController
+
 .. tip::
 
 	You can use the ``flow:routing:list`` command to list all routes which are currently active, see `CLI`_
+
+Subroutes from Annotations
+--------------------------
+
+The ``Flow\Route`` attribute allows to define routes directly on the affected method.
+(Currently only ActionController are supported https://github.com/neos/flow-development-collection/issues/3335)
+
+.. code-block:: php
+
+  use Neos\Flow\Mvc\Controller\ActionController;
+  use Neos\Flow\Annotations as Flow;
+
+  class ExampleController extends ActionController
+  {
+      #[Flow\Route(uriPattern:'my/path', httpMethods: ['GET'])]
+      public function someAction(): void
+      {
+      }
+
+      #[Flow\Route(uriPattern:'my/other/b-path', defaults: ['test' => 'b'])]
+      #[Flow\Route(uriPattern:'my/other/c-path', defaults: ['test' => 'c'])]
+      public function otherAction(string $test): void
+      {
+      }
+  }
+
+To find the annotation and tp specify the order of routes this has to be used together with the
+`\Neos\Flow\Mvc\Routing\AttributeRoutesProviderFactory` as `providerFactory` in  Setting `Neos.Flow.mvc.routes`
+
+.. code-block:: yaml
+
+  Neos:
+    Flow:
+      mvc:
+        routes:
+          Vendor.Example.attributes:
+            position: 'before Neos.Neos'
+            providerFactory: \Neos\Flow\Mvc\Routing\AttributeRoutesProviderFactory
+            providerOptions:
+              classNames:
+                - Vendor\Example\Controller\*
 
 Route Loading Order and the Flow Application Context
 ====================================================

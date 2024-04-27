@@ -11,6 +11,7 @@ namespace Neos\Flow;
  * source code.
  */
 
+use Neos\Flow\Annotations\Route;
 use Neos\Flow\Cache\AnnotationsCacheFlusher;
 use Neos\Flow\Configuration\Loader\AppendLoader;
 use Neos\Flow\Configuration\Source\YamlSource;
@@ -55,6 +56,7 @@ class Package extends BasePackage
         }
 
         if ($context->isTesting()) {
+            /** @phpstan-ignore-next-line composer doesnt autoload this class */
             $bootstrap->registerRequestHandler(new Tests\FunctionalTestRequestHandler($bootstrap));
         }
 
@@ -72,6 +74,7 @@ class Package extends BasePackage
                 if (!$request instanceof Mvc\ActionRequest || SecurityHelper::hasSafeMethod($request->getHttpRequest()) !== true) {
                     $bootstrap->getObjectManager()->get(Persistence\PersistenceManagerInterface::class)->persistAll();
                 } elseif (SecurityHelper::hasSafeMethod($request->getHttpRequest())) {
+                    /** @phpstan-ignore-next-line the persistence manager interface doesn't specify this method */
                     $bootstrap->getObjectManager()->get(Persistence\PersistenceManagerInterface::class)->persistAllowedObjects();
                 }
             }
@@ -81,7 +84,7 @@ class Package extends BasePackage
         $dispatcher->connect(Command\CacheCommandController::class, 'warmupCaches', PrecomposedHashProvider::class, 'precomposeHash');
 
         if (!$context->isProduction()) {
-            $dispatcher->connect(Core\Booting\Sequence::class, 'afterInvokeStep', function (Step $step) use ($bootstrap, $dispatcher) {
+            $dispatcher->connect(Core\Booting\Sequence::class, 'afterInvokeStep', function (Step $step) use ($bootstrap) {
                 if ($step->getIdentifier() === 'neos.flow:resources') {
                     $publicResourcesFileMonitor = Monitor\FileMonitor::createFileMonitorAtBoot('Flow_PublicResourcesFiles', $bootstrap);
                     /** @var PackageManager $packageManager */
@@ -107,7 +110,9 @@ class Package extends BasePackage
                 }
                 $objectManager = $bootstrap->getObjectManager();
                 $resourceManager = $objectManager->get(ResourceManager::class);
-                $resourceManager->getCollection(ResourceManager::DEFAULT_STATIC_COLLECTION_NAME)->publish();
+                if ($staticCollection = $resourceManager->getCollection(ResourceManager::DEFAULT_STATIC_COLLECTION_NAME)) {
+                    $staticCollection->publish();
+                }
             };
 
             $dispatcher->connect(Monitor\FileMonitor::class, 'filesHaveChanged', $publishResources);
@@ -130,6 +135,7 @@ class Package extends BasePackage
             }
         });
 
+        /** @phpstan-ignore-next-line composer doesnt autoload this class */
         $dispatcher->connect(Tests\FunctionalTestCase::class, 'functionalTestTearDown', Mvc\Routing\RouterCachingService::class, 'flushCaches');
 
         $dispatcher->connect(Configuration\ConfigurationManager::class, 'configurationManagerReady', function (Configuration\ConfigurationManager $configurationManager) {
@@ -153,6 +159,7 @@ class Package extends BasePackage
 
         $dispatcher->connect(Proxy\Compiler::class, 'compiledClasses', function (array $classNames) use ($bootstrap) {
             $annotationsCacheFlusher = $bootstrap->getObjectManager()->get(AnnotationsCacheFlusher::class);
+            $annotationsCacheFlusher->registerAnnotation(Route::class, ['Flow_Mvc_Routing_Route', 'Flow_Mvc_Routing_Resolve']);
             $annotationsCacheFlusher->flushConfigurationCachesByCompiledClass($classNames);
         });
     }

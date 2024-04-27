@@ -11,8 +11,9 @@ namespace Neos\Flow\Cache;
  * source code.
  */
 
+use Neos\Cache\CacheFactoryInterface;
 use Neos\Flow\Annotations as Flow;
-use Neos\Flow\Cache\Backend\FileBackend;
+use Neos\Cache\Backend\FileBackend;
 use Neos\Cache\Exception\DuplicateIdentifierException;
 use Neos\Cache\Exception\NoSuchCacheException;
 use Neos\Cache\Frontend\FrontendInterface;
@@ -37,7 +38,7 @@ use Psr\Cache\CacheItemPoolInterface;
 class CacheManager
 {
     /**
-     * @var CacheFactory
+     * @var CacheFactoryInterface
      */
     protected $cacheFactory;
 
@@ -100,10 +101,10 @@ class CacheManager
     }
 
     /**
-     * @param CacheFactory $cacheFactory
+     * @param CacheFactoryInterface $cacheFactory
      * @return void
      */
-    public function injectCacheFactory(CacheFactory $cacheFactory): void
+    public function injectCacheFactory(CacheFactoryInterface $cacheFactory): void
     {
         $this->cacheFactory = $cacheFactory;
     }
@@ -496,6 +497,7 @@ class CacheManager
         $backend = isset($this->cacheConfigurations[$identifier]['backend']) ? $this->cacheConfigurations[$identifier]['backend'] : $this->cacheConfigurations['Default']['backend'];
         $backendOptions = isset($this->cacheConfigurations[$identifier]['backendOptions']) ? $this->cacheConfigurations[$identifier]['backendOptions'] : $this->cacheConfigurations['Default']['backendOptions'];
         $persistent = isset($this->cacheConfigurations[$identifier]['persistent']) ? $this->cacheConfigurations[$identifier]['persistent'] : $this->cacheConfigurations['Default']['persistent'];
+        // @phpstan-ignore-next-line - $persistent is not yet part of the CacheFactoryInterface
         $cache = $this->cacheFactory->create($identifier, $frontend, $backend, $backendOptions, $persistent);
         $this->registerCache($cache, $persistent);
     }
