@@ -18,7 +18,6 @@ use Neos\Flow\ObjectManagement\Exception\UnknownObjectException;
 use Neos\Flow\ObjectManagement\ObjectManagerInterface;
 use Neos\Flow\Package\PackageManager;
 use Neos\Flow\Security\Cryptography\HashService;
-use Neos\Flow\SignalSlot\Dispatcher as SignalSlotDispatcher;
 use Neos\Utility\Arrays;
 
 /**
@@ -26,7 +25,7 @@ use Neos\Utility\Arrays;
  *
  * @api
  */
-class ActionRequest implements RequestInterface
+class ActionRequest
 {
     /**
      * @Flow\Inject
@@ -105,12 +104,6 @@ class ActionRequest implements RequestInterface
      * @var string
      */
     protected $format = '';
-
-    /**
-     * If this request has been changed and needs to be dispatched again
-     * @var boolean
-     */
-    protected $dispatched = false;
 
     /**
      * The parent request – either another sub ActionRequest a main ActionRequest or null
@@ -212,6 +205,7 @@ class ActionRequest implements RequestInterface
      * Checks if this request is the uppermost ActionRequest, just one below the
      * HTTP request.
      *
+     * @phpstan-assert-if-true null $this->getParentRequest()
      * @return boolean
      * @api
      */
@@ -261,38 +255,6 @@ class ActionRequest implements RequestInterface
         }
         $this->referringRequest = $this->internalArguments['__referrer'];
         return $this->referringRequest;
-    }
-
-    /**
-     * Sets the dispatched flag
-     *
-     * @param boolean $flag If this request has been dispatched
-     * @return void
-     * @throws \Neos\Flow\SignalSlot\Exception\InvalidSlotException
-     * @api
-     */
-    public function setDispatched($flag): void
-    {
-        $this->dispatched = (bool)$flag;
-
-        if ($flag) {
-            $this->emitRequestDispatched($this);
-        }
-    }
-
-    /**
-     * If this request has been dispatched and addressed by the responsible
-     * controller and the response is ready to be sent.
-     *
-     * The dispatcher will try to dispatch the request again if it has not been
-     * addressed yet.
-     *
-     * @return boolean true if this request has been dispatched successfully
-     * @api
-     */
-    public function isDispatched(): bool
-    {
-        return $this->dispatched;
     }
 
     /**
@@ -510,7 +472,7 @@ class ActionRequest implements RequestInterface
             throw new Exception\InvalidArgumentNameException('Invalid argument name (must be a non-empty string).', 1210858767);
         }
 
-        if (strpos($argumentName, '__') === 0) {
+        if (str_starts_with($argumentName, '__')) {
             $this->internalArguments[$argumentName] = $value;
             return;
         }
@@ -520,7 +482,7 @@ class ActionRequest implements RequestInterface
             throw new Exception\InvalidArgumentTypeException('You are not allowed to store objects in the request arguments. Please convert the object of type "' . get_class($value) . '" given for argument "' . $argumentName . '" to a simple type first.', 1302783022);
         }
 
-        if (strpos($argumentName, '--') === 0) {
+        if (str_starts_with($argumentName, '--')) {
             $this->pluginArguments[substr($argumentName, 2)] = $value;
             return;
         }
@@ -689,35 +651,6 @@ class ActionRequest implements RequestInterface
     }
 
     /**
-     * Emits a signal when a Request has been dispatched
-     *
-     * The action request is not proxyable, so the signal is dispatched manually here.
-     * The safeguard allows unit tests without the dispatcher dependency.
-     *
-     * @param ActionRequest $request
-     * @return void
-     * @Flow\Signal
-     * @throws \Neos\Flow\SignalSlot\Exception\InvalidSlotException
-     */
-    protected function emitRequestDispatched($request): void
-    {
-        if ($this->objectManager !== null) {
-            $dispatcher = $this->objectManager->get(SignalSlotDispatcher::class);
-            if ($dispatcher !== null) {
-                $dispatcher->dispatch(ActionRequest::class, 'requestDispatched', [$request]);
-            }
-        }
-    }
-
-    /**
-     * Resets the dispatched status to false
-     */
-    public function __clone()
-    {
-        $this->dispatched = false;
-    }
-
-    /**
      * We provide our own __sleep method, where we serialize all properties *except* the parentRequest if it is
      * a HTTP request -- as this one contains $_SERVER etc.
      *
@@ -725,7 +658,7 @@ class ActionRequest implements RequestInterface
      */
     public function __sleep()
     {
-        $properties = ['controllerPackageKey', 'controllerSubpackageKey', 'controllerName', 'controllerActionName', 'arguments', 'internalArguments', 'pluginArguments', 'argumentNamespace', 'format', 'dispatched'];
+        $properties = ['controllerPackageKey', 'controllerSubpackageKey', 'controllerName', 'controllerActionName', 'arguments', 'internalArguments', 'pluginArguments', 'argumentNamespace', 'format'];
         if ($this->parentRequest instanceof ActionRequest) {
             $properties[] = 'parentRequest';
         }

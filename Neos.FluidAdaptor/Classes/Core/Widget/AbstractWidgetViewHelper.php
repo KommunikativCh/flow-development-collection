@@ -12,7 +12,6 @@ namespace Neos\FluidAdaptor\Core\Widget;
  */
 
 use Neos\Flow\Mvc\ActionRequest;
-use Neos\Flow\Mvc\ActionResponse;
 use Neos\Flow\Mvc\Exception\ForwardException;
 use Neos\Flow\Mvc\Exception\InfiniteLoopException;
 use Neos\Flow\Mvc\Exception\StopActionException;
@@ -225,37 +224,56 @@ abstract class AbstractWidgetViewHelper extends AbstractViewHelper implements Ch
         $subRequest->setArgumentNamespace('--' . $this->widgetContext->getWidgetIdentifier());
 
         $dispatchLoopCount = 0;
-        $subResponse = new ActionResponse();
-        $content = '';
-        while (!$subRequest->isDispatched()) {
-            if ($dispatchLoopCount++ > 99) {
-                throw new InfiniteLoopException('Could not ultimately dispatch the widget request after ' . $dispatchLoopCount . ' iterations.', 1380282310);
-            }
-            $subResponse = new ActionResponse();
-
+        do {
             $widgetControllerObjectName = $this->widgetContext->getControllerObjectName();
             if ($subRequest->getControllerObjectName() !== '' && $subRequest->getControllerObjectName() !== $widgetControllerObjectName) {
                 throw new Exception\InvalidControllerException(sprintf('You are not allowed to initiate requests to different controllers from a widget.' . chr(10) . 'widget controller: "%s", requested controller: "%s".', $widgetControllerObjectName, $subRequest->getControllerObjectName()), 1380284579);
             }
             $subRequest->setControllerObjectName($this->widgetContext->getControllerObjectName());
             try {
-                $this->controller->processRequest($subRequest, $subResponse);
+                $subResponse = $this->controller->processRequest($subRequest);
 
                 // We need to make sure to not merge content up into the parent ActionResponse because that _could_ break the parent response.
-                $content = $subResponse->getContent();
-                $subResponse->setContent('');
-            } catch (StopActionException $exception) {
-                if ($exception instanceof ForwardException) {
-                    $subRequest = $exception->getNextRequest();
-                    continue;
-                }
-                $subResponse->mergeIntoParentResponse($this->controllerContext->getResponse());
-                throw $exception;
-            }
-            $subResponse->mergeIntoParentResponse($this->controllerContext->getResponse());
-        }
+                $content = $subResponse->getBody()->getContents();
 
-        return $content;
+                // hacky, but part of the deal. Legacy behaviour of "mergeIntoParentResponse":
+                // we have to manipulate the global response to redirect for example.
+                // transfer possible headers that have been set dynamically
+                foreach ($subResponse->getHeaders() as $name => $values) {
+                    $this->controllerContext->getResponse()->setHttpHeader($name, $values);
+                }
+                // if the status code is 200 we assume it's the default and will not overrule it
+                if ($subResponse->getStatusCode() !== 200) {
+                    $this->controllerContext->getResponse()->setStatusCode($subResponse->getStatusCode());
+                }
+
+                return $content;
+            } catch (StopActionException $exception) {
+                $subResponse = $exception->response;
+                $parentResponse = $this->controllerContext->getResponse()->buildHttpResponse();
+
+                // legacy behaviour of "mergeIntoParentResponse":
+                // transfer possible headers that have been set dynamically
+                foreach ($subResponse->getHeaders() as $name => $values) {
+                    $parentResponse = $parentResponse->withHeader($name, $values);
+                }
+                // if the status code is 200 we assume it's the default and will not overrule it
+                if ($subResponse->getStatusCode() !== 200) {
+                    $parentResponse = $parentResponse->withStatus($subResponse->getStatusCode());
+                }
+                // if the known body size is not empty replace the body
+                // we keep the contents of $subResponse as it might contain <meta http-equiv="refresh" for redirects
+                if ($subResponse->getBody()->getSize() !== 0) {
+                    $parentResponse = $parentResponse->withBody($subResponse->getBody());
+                }
+
+                throw StopActionException::createForResponse($parentResponse, 'Intercepted from widget view helper.');
+            } catch (ForwardException $exception) {
+                $subRequest = $exception->nextRequest;
+                continue;
+            }
+        } while ($dispatchLoopCount++ < 99);
+        throw new InfiniteLoopException('Could not ultimately dispatch the widget request after ' . $dispatchLoopCount . ' iterations.', 1380282310);
     }
 
     /**
