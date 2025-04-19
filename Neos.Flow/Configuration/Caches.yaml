@@ -95,16 +95,13 @@ Flow_Persistence_Doctrine_Results:
 Flow_Persistence_Doctrine_SecondLevel:
   backend: Neos\Cache\Backend\SimpleFileBackend
 
-# Flow_Reflection*
+# Flow_Reflection
 #
 #
-Flow_Reflection_Status:
-  frontend: Neos\Cache\Frontend\StringFrontend
+Flow_Reflection_RuntimeData:
   backend: Neos\Cache\Backend\SimpleFileBackend
-Flow_Reflection_CompiletimeData:
+Flow_Reflection_RuntimeClassSchemata:
   backend: Neos\Cache\Backend\SimpleFileBackend
-Flow_Reflection_RuntimeData: []
-Flow_Reflection_RuntimeClassSchemata: []
 
 # Flow_Resource_Status
 #

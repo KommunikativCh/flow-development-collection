@@ -11,6 +11,7 @@ namespace Neos\Flow\Mvc\Controller;
  * source code.
  */
 
+use GuzzleHttp\Psr7\Response;
 use GuzzleHttp\Psr7\Utils;
 use Neos\Error\Messages as Error;
 use Neos\Flow\Annotations as Flow;
@@ -21,6 +22,7 @@ use Neos\Flow\Mvc\Exception\InvalidArgumentTypeException;
 use Neos\Flow\Mvc\Exception\InvalidControllerNameException;
 use Neos\Flow\Mvc\Exception\NoSuchArgumentException;
 use Neos\Flow\Mvc\Routing\Exception\MissingActionNameException;
+use Neos\Flow\Mvc\Routing\RouteValuesNormalizerInterface;
 use Neos\Flow\Persistence\Exception\UnknownObjectException;
 use Neos\Flow\Property\Exception;
 use Psr\Http\Message\UriInterface;
@@ -32,7 +34,6 @@ use Neos\Flow\Mvc\Exception\ForwardException;
 use Neos\Flow\Mvc\Exception\RequiredArgumentMissingException;
 use Neos\Flow\Mvc\Exception\StopActionException;
 use Neos\Flow\Mvc\Routing\UriBuilder;
-use Neos\Flow\Persistence\PersistenceManagerInterface;
 use Neos\Flow\Validation\ValidatorResolver;
 use Neos\Utility\MediaTypes;
 
@@ -63,6 +64,17 @@ abstract class AbstractController implements ControllerInterface
 
     /**
      * The legacy response which will is provide by this action controller
+     *
+     * Legacy ways to modify a repose:
+     *
+     * - $this->response->addHttpHeader
+     * - $this->response->setHttpHeader
+     * - $this->response->setContentType
+     * - $this->response->setStatusCode
+     *
+     * Please return a new {@see Response} instead from your controller action.
+     * Documentation to adjust your code is provided in {@see ActionResponse}.
+     *
      * @var ActionResponse
      * @deprecated with Flow 9 {@see ActionResponse}
      */
@@ -82,9 +94,9 @@ abstract class AbstractController implements ControllerInterface
 
     /**
      * @Flow\Inject
-     * @var PersistenceManagerInterface
+     * @var RouteValuesNormalizerInterface
      */
-    protected $persistenceManager;
+    protected $routeValuesNormalizer;
 
     /**
      * A list of IANA media types which are supported by this controller
@@ -199,7 +211,7 @@ abstract class AbstractController implements ControllerInterface
      * @see redirect()
      * @api
      */
-    protected function forward(string $actionName, string $controllerName = null, string $packageKey = null, array $arguments = []): never
+    protected function forward(string $actionName, ?string $controllerName = null, ?string $packageKey = null, array $arguments = []): never
     {
         $nextRequest = clone $this->request;
         $nextRequest->setControllerActionName($actionName);
@@ -225,7 +237,7 @@ abstract class AbstractController implements ControllerInterface
                 $regularArguments[$argumentName] = $argumentValue;
             }
         }
-        $nextRequest->setArguments($this->persistenceManager->convertObjectsToIdentityArrays($regularArguments));
+        $nextRequest->setArguments($this->routeValuesNormalizer->normalizeObjects($regularArguments));
         $this->arguments->removeAll();
 
         $this->forwardToRequest($nextRequest);
@@ -269,7 +281,7 @@ abstract class AbstractController implements ControllerInterface
      * @see forward()
      * @api
      */
-    protected function redirect(string $actionName, ?string $controllerName = null, ?string $packageKey = null, array $arguments = [], int $delay = 0, int $statusCode = 303, string $format = null): never
+    protected function redirect(string $actionName, ?string $controllerName = null, ?string $packageKey = null, array $arguments = [], int $delay = 0, int $statusCode = 303, ?string $format = null): never
     {
         if ($packageKey !== null && str_contains($packageKey, '\\') !== false) {
             [$packageKey, $subpackageKey] = explode('\\', $packageKey, 2);

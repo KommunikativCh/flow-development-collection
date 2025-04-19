@@ -247,7 +247,7 @@ class Scripts
         $throwableStorage = self::initializeExceptionStorage($bootstrap, $settings);
         $bootstrap->setEarlyInstance(ThrowableStorageInterface::class, $throwableStorage);
 
-        /** @var PsrLoggerFactoryInterface $psrLoggerFactoryName */
+        /** @var class-string $psrLoggerFactoryName */
         $psrLoggerFactoryName = $settings['log']['psr3']['loggerFactory'];
         $psrLogConfigurations = $settings['log']['psr3'][$psrLoggerFactoryName] ?? [];
         $psrLogFactory = $psrLoggerFactoryName::create($psrLogConfigurations);
@@ -578,10 +578,6 @@ class Scripts
 
         /** @var FlowPackageInterface $package */
         foreach ($packageManager->getFlowPackages() as $packageKey => $package) {
-            if ($packageManager->isPackageFrozen($packageKey)) {
-                continue;
-            }
-
             self::monitorDirectoryIfItExists($fileMonitors['Flow_ConfigurationFiles'], $package->getConfigurationPath(), '\.y(a)?ml$');
             self::monitorDirectoryIfItExists($fileMonitors['Flow_TranslationFiles'], $package->getResourcesPath() . 'Private/Translations/', '\.xlf');
 
@@ -637,7 +633,7 @@ class Scripts
      * @param string $filenamePattern Optional pattern for filenames to consider for file monitoring (regular expression). @see FileMonitor::monitorDirectory()
      * @return void
      */
-    protected static function monitorDirectoryIfItExists(FileMonitor $fileMonitor, string $path, string $filenamePattern = null)
+    protected static function monitorDirectoryIfItExists(FileMonitor $fileMonitor, string $path, ?string $filenamePattern = null)
     {
         if (is_dir($path)) {
             $fileMonitor->monitorDirectory($path, $filenamePattern);
